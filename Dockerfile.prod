@@ -1,0 +1,38 @@
+# Dockerfile.prod
+FROM ruby:3.2-slim
+
+# Устанавливаем только необходимые системные зависимости для рантайма
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    libpq-dev \
+    nodejs \
+    yarn \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем переменную окружения для Rails
+ENV RAILS_ENV=production
+ENV NODE_ENV=production
+
+# Важно для продакшена: не устанавливаем development и test гемы
+ENV BUNDLE_WITHOUT="development:test"
+
+WORKDIR /app
+
+COPY Gemfile Gemfile.lock ./
+
+# Устанавливаем гемы без dev/test групп
+# Флаг --without (или BUNDLE_WITHOUT) исключает указанные группы
+RUN bundle config set --local path 'vendor/bundle' && \
+    bundle install
+
+COPY package.json yarn.lock ./
+RUN yarn install --production
+
+COPY . .
+
+# Опционально: прекомпиляция ассетов для продакшена
+# RUN bundle exec rake assets:precompile
+
+EXPOSE 3000
+
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]

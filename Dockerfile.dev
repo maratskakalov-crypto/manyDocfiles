@@ -1,0 +1,41 @@
+# Dockerfile.dev
+# Используем Ruby версии не ниже 2.6 (согласно заданию)
+FROM ruby:3.2-slim
+
+# Устанавливаем системные зависимости, необходимые для alonetone
+# libsndfile1 нужен для гема ruby-audio (согласно документации alonetone)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libsndfile1 \
+    libpq-dev \
+    nodejs \
+    yarn \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем переменную окружения для Rails
+ENV RAILS_ENV=development
+ENV NODE_ENV=development
+
+WORKDIR /app
+
+# Копируем Gemfile и lock-файл для кэширования слоя с бандлом
+COPY Gemfile Gemfile.lock ./
+
+# Устанавливаем бандлер и все гемы (включая dev/test)
+# По умолчанию bundler ставит все группы, если не указано иное
+RUN bundle config set --local path 'vendor/bundle' && \
+    bundle install
+
+# Копируем package.json и yarn.lock для установки JS-зависимостей
+COPY package.json yarn.lock ./
+RUN yarn install
+
+# Копируем весь остальной код проекта
+COPY . .
+
+# Открываем порт (стандартный для Rails)
+EXPOSE 3000
+
+# Команда запуска для разработки (сервер Rails)
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
